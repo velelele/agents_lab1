@@ -62,6 +62,16 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
+# Models and LLM weights
+models/
+.runtime/
+*.gguf
+*.bin
+
+# Environment variables
+.env
+
+
 # Flask stuff:
 instance/
 .webassets-cache

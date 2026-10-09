@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lab 1 — Prompt Engineering</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #20243a;
+      --muted: #68708b;
+      --line: #e2e6f0;
+      --paper: #ffffff;
+      --wash: #f5f6fb;
+      --violet: #5846c7;
+      --violet-soft: #eeebff;
+      --green: #176c4a;
+      --green-soft: #e7f6ee;
+      --amber: #865400;
+      --amber-soft: #fff4d8;
+      --code: #171a2b;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--wash);
+      color: var(--ink);
+      font: 16px/1.6 Inter, "Segoe UI", Arial, sans-serif;
+    }
+    .page { width: min(1040px, calc(100% - 36px)); margin: 42px auto 72px; }
+    .hero {
+      padding: clamp(28px, 6vw, 62px);
+      border-radius: 28px;
+      background: linear-gradient(135deg, #24213d 0%, #433a82 58%, #6a59d7 100%);
+      color: white;
+      box-shadow: 0 24px 60px #2d28501f;
+    }
+    .eyebrow { color: #d4ceff; font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    h1 { max-width: 760px; margin: 14px 0 12px; font-size: clamp(34px, 6vw, 58px); line-height: 1.05; letter-spacing: -.04em; }
+    .hero p { max-width: 720px; margin: 0; color: #eceaff; font-size: 18px; }
+    .badges { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+    .badge { padding: 8px 12px; border: 1px solid #ffffff45; border-radius: 999px; background: #ffffff12; font-size: 13px; font-weight: 700; }
+    main { display: grid; gap: 18px; margin-top: 22px; }
+    section { padding: clamp(22px, 4vw, 34px); border: 1px solid var(--line); border-radius: 22px; background: var(--paper); box-shadow: 0 8px 30px #26305a08; }
+    h2 { margin: 0 0 14px; font-size: 24px; letter-spacing: -.02em; }
+    h3 { margin: 20px 0 8px; font-size: 17px; }
+    p { margin: 8px 0; }
+    .muted { color: var(--muted); }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+    .card { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+    .card strong { display: block; margin-bottom: 5px; }
+    .before { border-color: #f0dcae; background: var(--amber-soft); }
+    .after { border-color: #c9e8d7; background: var(--green-soft); }
+    .step { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; margin: 13px 0; }
+    .num { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 11px; background: var(--violet-soft); color: var(--violet); font-weight: 800; }
+    .step p { margin: 2px 0 0; }
+    .callout { padding: 14px 16px; border-left: 4px solid var(--violet); border-radius: 0 12px 12px 0; background: var(--violet-soft); }
+    .prompt-note { margin-bottom: 14px; color: var(--muted); font-size: 14px; }
+    pre { overflow: auto; margin: 0; padding: 22px; border-radius: 16px; background: var(--code); color: #f0efff; font: 13px/1.65 Consolas, "Cascadia Code", monospace; white-space: pre-wrap; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 690px; }
+    th, td { padding: 12px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+    td:first-child { width: 36px; color: var(--muted); }
+    code { padding: 2px 5px; border-radius: 5px; background: #f0f1f7; font: 13px Consolas, monospace; }
+    .pass { color: var(--green); font-weight: 800; }
+    a { color: var(--violet); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    footer { padding: 18px 8px; color: var(--muted); font-size: 13px; }
+    @media (max-width: 680px) {
+      .page { width: min(100% - 20px, 1040px); margin-top: 10px; }
+      .hero, section { border-radius: 18px; }
+      .grid { grid-template-columns: 1fr; }
+      body { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div class="eyebrow">Laboratory 1 · Part 4.2</div>
+      <h1>Prompt engineering для локальных моделей</h1>
+      <p>Prompt engineering ReAct-агента на Maple-Preview: точный разбор Action / Observation / Answer, последовательные tool-вызовы и проверка качества на восьми запросах.</p>
+      <div class="badges">
+        <span class="badge">Maple-Preview · 8/8</span>
+        <span class="badge">Qwen 2.5 3B · 7/8</span>
+        <span class="badge">Llama 3.2 3B · 8/8</span>
+        <span class="badge">Локально · без OpenRouter</span>
+      </div>
+    </header>
+
+    <main>
+      <section>
+        <h2>Результат пункта 4.2</h2>
+        <p>Промпт настроен и проверен на <strong>Maple-Preview</strong>, запущенной локально из GGUF через llama.cpp на CPU. Облачный API и OpenRouter не использовались.</p>
+        <div class="grid">
+          <div class="card after">
+            <strong>Итоговый прогон Maple-Preview</strong>
+            <p><span class="pass">8/8 запросов пройдены.</span> Для каждого запроса проверялись нужные инструменты, лишние и повторные вызовы, а также данные в итоговом ответе.</p>
+            <p>Среднее время: <strong>9.33 с</strong>. Версия промпта: <code>maple_prompt_iteration_v12</code>.</p>
+            <p><a href="logs/benchmark_maple_20261009_140233.log">Открыть полный Maple benchmark log</a></p>
+          </div>
+          <div class="card">
+            <strong>Исправленная цепочка ReAct</strong>
+            <p>После выполнения функции агент сразу записывает её вызов и фактический результат <code>Observation</code> в историю. Следующий ход модели видит исходный запрос и все уже полученные ответы.</p>
+            <p>Это устранило повторы, вызванные тем, что модель раньше не получала результат только что выполненного инструмента.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Итерации prompt engineering</h2>
+        <div class="step"><span class="num">1</span><p><strong>Строгая оценка.</strong> Проверка стала требовать каждый ожидаемый инструмент, отсутствие лишних вызовов и совпадение результата. Повтор того же инструмента с теми же аргументами теперь считается ошибкой; курс евро проверяется именно как <code>1 EUR = 100.85 RUB</code>.</p></div>
+        <div class="step"><span class="num">2</span><p><strong>В v6 добавлены явные маршруты.</strong> Промпт указал соответствия «погода → get_weather», «курс евро → EUR», расчёт процентов через <code>Y * X / 100</code>, а также требование копировать число из результата инструмента. Промежуточная проверка прошла 3/4 сложных кейсов, но модель скопировала ответ из примера про Токио и не вызвала функции.</p></div>
+        <div class="step"><span class="num">3</span><p><strong>Убраны ответы из few-shot примеров.</strong> Финальный v12 оставил краткие правила маршрутизации и формат одной строки: один <code>Action</code> либо итоговый <code>Answer</code>. Тестовые вопросы и ожидаемые ответы не вшиты в примеры.</p></div>
+        <div class="step"><span class="num">4</span><p><strong>Исправлена передача Observation.</strong> Текущий шаг инструмента теперь добавляется в историю до формирования следующего запроса к модели. Поэтому Maple получает настоящий результат и не пытается повторно получить тот же факт.</p></div>
+        <p class="muted">Промежуточный лог v11, где обнаружилось копирование ответа без функций: <a href="logs/benchmark_maple_20261009_140038.log">3/4 кейсов</a>. Финальный прогон v12: <a href="logs/benchmark_maple_20261009_140233.log">8/8 кейсов</a>.</p>
+      </section>
+
+      <section>
+        <h2>Активный системный промпт v12</h2>
+        <p class="prompt-note">Приложение добавляет в начало описания функций из <code>src/tools.py</code>. Ниже фиксированная часть из <code>src/prompt_templates.py</code>.</p>
+        <pre>Ты — русскоязычный помощник. Отвечай пользователю кратко и точно.
+
+Выполни все инструменты, которые нужны для прямых просьб пользователя:
+- Погода в городе: get_weather(city="город").
+- Курс валюты: get_exchange_rate(pair="USD"); доллар=USD, евро=EUR, юань=CNY.
+- Явный вопрос «который сейчас час» или о времени/дате: get_current_time(). Само слово «сейчас» не означает вопрос о времени.
+- Статус устройства: get_device_status(device="устройство").
+- Вычисление или процент: calculate(expression="выражение"). X% от Y записывай как Y * X / 100.
+- Другие запросы: ответь без инструмента.
+
+Ориентируйся только на исходную просьбу; примеры и результаты не создают новых просьб. Результаты инструментов — источник истины: переноси числа и названия точно, calculate не пересчитывай сам. После каждого результата вызови только следующий ещё нужный инструмент, а если все запрошенные данные получены — сразу ответь. Каждый инструмент с теми же аргументами вызывай не более одного раза.
+
+Формат каждого хода — строго одна строка:
+Action: имя_инструмента(аргумент="значение")
+или, когда данные получены или инструмент не нужен:
+Answer: короткий ответ одним предложением.
+Не пиши рассуждения, планы, несколько Action или пояснения к формату.</pre>
+      </section>
+
+      <section>
+        <h2>Проверка Maple-Preview: 8 запросов</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Запрос</th><th>Ожидаемые вызовы</th><th>Результат</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td>Погода в Москве</td><td><code>get_weather</code></td><td class="pass">PASS · +14°C</td></tr>
+              <tr><td>2</td><td>256 × 48 + 100</td><td><code>calculate</code></td><td class="pass">PASS · 12388</td></tr>
+              <tr><td>3</td><td>Курс доллара</td><td><code>get_exchange_rate(USD)</code></td><td class="pass">PASS · 92.40 RUB</td></tr>
+              <tr><td>4</td><td>Текущее время</td><td><code>get_current_time</code></td><td class="pass">PASS · 12:30</td></tr>
+              <tr><td>5</td><td>Статус кондиционера</td><td><code>get_device_status</code></td><td class="pass">PASS · 21°C</td></tr>
+              <tr><td>6</td><td>Что такое нейронная сеть?</td><td>без инструментов</td><td class="pass">PASS · ответ напрямую</td></tr>
+              <tr><td>7</td><td>Погода в Токио и курс евро</td><td><code>get_weather</code> + <code>get_exchange_rate(EUR)</code></td><td class="pass">PASS · +22°C и 100.85 RUB</td></tr>
+              <tr><td>8</td><td>15% от 8500</td><td><code>calculate</code></td><td class="pass">PASS · 1275</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>Пункт 4.1: отдельные логи двух локальных моделей</h2>
+        <p>Последние сохранённые прогоны до prompt v12: <strong>Qwen 2.5 3B — 7/8</strong> (лишний вызов <code>calculate</code> в ответе-определении) и <strong>Llama 3.2 3B — 8/8</strong>. Они запускались отдельно, результаты лежат в отдельных логах.</p>
+        <p><a href="logs/benchmark_qwen_20261009_130514.log">Лог Qwen 7/8</a> · <a href="logs/benchmark_llama_20261009_130618.log">Лог Llama 8/8</a></p>
+        <p class="muted">Проверки benchmark и строгая оценка находятся в <a href="scripts/run_benchmark.py">scripts/run_benchmark.py</a>; активный prompt — в <a href="src/prompt_templates.py">src/prompt_templates.py</a>; цикл агента — в <a href="src/agent.py">src/agent.py</a>.</p>
+      </section>
+    </main>
+    <footer>Lab 1 · ReAct через текстовый формат Action / Observation / Answer · 9 октября 2026</footer>
+  </div>
+</body>
+</html>

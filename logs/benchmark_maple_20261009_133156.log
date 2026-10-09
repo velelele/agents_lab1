@@ -1,0 +1,363 @@
+{
+  "model": "maple",
+  "model_name": "Maple-Preview 20B-A1B",
+  "timestamp": "20261009_133156",
+  "total_queries": 8,
+  "execution_successful": 8,
+  "quality_passed": 7,
+  "successful": 7,
+  "failed": 1,
+  "avg_time_sec": 11.58,
+  "quality_definition": "Все ожидаемые инструменты вызваны, лишних вызовов нет, ответ содержит проверяемые результаты.",
+  "prompt_version": "react_tool_routing_v2",
+  "system_prompt": "Ты — русскоязычный помощник. Отвечай кратко и по делу.\n\nТебе доступны следующие инструменты (функции):\n- get_weather(city=\"Название города\") — узнать погоду в городе\n- get_current_time() — узнать текущее время и дату\n- get_exchange_rate(pair=\"USD\") — получить курс валюты к рублю (USD, EUR, CNY)\n- calculate(expression=\"2 + 2 * 2\") — посчитать математическое выражение\n- get_device_status(device=\"кондиционер\") — проверить состояние прибора умного дома (передавай название устройства из запроса, например кондиционер, свет, чайник)\n\n=== ВЫБОР ИНСТРУМЕНТА ===\nКлассифицируй запрос и сразу выбери действие. Не печатай рассуждения или план.\n- Вопрос о погоде → get_weather; о текущем времени → get_current_time; о валютном курсе → get_exchange_rate.\n- Вопрос о состоянии, режиме или температуре названного устройства → get_device_status. Передавай название устройства ровно как в запросе.\n- calculate вызывай только для явно заданного вычисления, арифметического выражения или процента.\nИспользуй только исходный запрос, не примеры. Для общего знания, определения, приветствия, совета или просьбы написать текст сразу дай Answer без инструментов.\nЕсли подходит инструмент, первой и единственной строкой выведи его Action. Для статуса кондиционера это Action: get_device_status(device=\"кондиционер\").\n\n=== ФОРМАТ ОТВЕТА ===\nВ каждом ходе выведи ровно один вариант:\n\nВызов инструмента:\nAction: имя_инструмента(аргумент=\"значение\")\nВыведи только эту строку и остановись. Не пиши Thought, Answer или Observation.\n\nГотовый ответ:\nAnswer: ответ пользователю\n\nЗа один ход вызывай только один инструмент. После Observation вернись к исходному запросу и проверь каждый запрошенный факт. Если хотя бы один факт еще не получен, вызови следующий нужный инструмент. Не формулируй финальный ответ, пока не получены все данные. Если все данные есть, ответь одной строкой Answer:.\n\nЕсли запрос состоит из нескольких частей, проверь каждую часть отдельно. Например, в вопросе о погоде и курсе валют нужны два вызова: get_weather и get_exchange_rate.\nДля процентов используй calculate: преобразуй процент в арифметическое выражение и передай его инструменту.\n\n=== ПРИМЕРЫ ===\nВсе факты и числа ниже только показывают формат. Не используй значения из примеров как данные или ответ для пользовательского запроса.\n\nПользователь: Что такое градиентный спуск?\nАссистент:\nAnswer: Градиентный спуск — метод оптимизации, который постепенно меняет параметры модели, чтобы уменьшить ошибку.\n\nПользователь: Какая погода в Сочи и курс доллара?\nАссистент:\nAction: get_weather(city=\"Сочи\")\n\nObservation: Погода в городе Сочи: +21°C, солнечно, штиль\nВернись к исходному запросу. Если остались не полученные данные, выведи следующий Action. Если все данные получены, сформулируй Answer:\nАссистент:\nAction: get_exchange_rate(pair=\"USD\")\n\nObservation: 1 USD = 92.40 RUB\nВернись к исходному запросу. Если остались не полученные данные, выведи следующий Action. Если все данные получены, сформулируй Answer:\nАссистент:\nAnswer: В Сочи +21°C и солнечно. Курс доллара: 1 USD = 92.40 RUB.\n\nПользователь: Какой статус кондиционера?\nАссистент:\nAction: get_device_status(device=\"кондиционер\")\n\nObservation: Кондиционер: ВКЛЮЧЕН, режим Охлаждение, целевая температура 21°C\nВернись к исходному запросу. Если остались не полученные данные, выведи следующий Action. Если все данные получены, сформулируй Answer:\nАссистент:\nAnswer: Кондиционер включен в режиме охлаждения, целевая температура 21°C.\n\nПользователь: Который сейчас час?\nАссистент:\nAction: get_current_time()\n\nObservation: Текущее время: 12:30:00 (MSK, UTC+3), дата: 09 октября 2026 года\nВернись к исходному запросу. Если остались не полученные данные, выведи следующий Action. Если все данные получены, сформулируй Answer:\nАссистент:\nAnswer: Сейчас 12:30 по московскому времени, 09 октября 2026 года.\n\nПользователь: Сколько будет 12 процентов от 600?\nАссистент:\nAction: calculate(expression=\"600 * 12 / 100\")\n\nObservation: 600 * 12 / 100 = 72.0\nВернись к исходному запросу. Если остались не полученные данные, выведи следующий Action. Если все данные получены, сформулируй Answer:\nАссистент:\nAnswer: 12% от 600 — это 72.\n",
+  "results": [
+    {
+      "query_index": 1,
+      "query": "Какая сейчас погода в Москве?",
+      "model": "maple",
+      "model_name": "Maple-Preview 20B-A1B",
+      "final_answer": "Погода в Москве: +14°C, переменная облачность, ветер 4 м/с.",
+      "steps_count": 2,
+      "total_time_sec": 20.98,
+      "steps_detail": [
+        {
+          "step": 1,
+          "action": "get_weather",
+          "args": {
+            "city": "Москва"
+          },
+          "observation": "Погода в городе Москва: +14°C, переменная облачность, ветер 4 м/с",
+          "raw_response": "Action: get_weather(city=\"Москва\")"
+        },
+        {
+          "step": 2,
+          "action": null,
+          "args": {},
+          "observation": null,
+          "raw_response": "Answer: Погода в Москве: +14°C, переменная облачность, ветер 4 м/с."
+        }
+      ],
+      "execution_successful": true,
+      "expected_tools": [
+        "get_weather"
+      ],
+      "called_tools": [
+        "get_weather"
+      ],
+      "missing_tools": [],
+      "unexpected_tools": [],
+      "answer_patterns": [
+        "\\+14\\s*°?C"
+      ],
+      "missing_answer_patterns": [],
+      "quality_issues": [],
+      "quality_passed": true
+    },
+    {
+      "query_index": 2,
+      "query": "Сколько будет 256 * 48 + 100?",
+      "model": "maple",
+      "model_name": "Maple-Preview 20B-A1B",
+      "final_answer": "256 * 48 + 100 = 12388",
+      "steps_count": 2,
+      "total_time_sec": 8.59,
+      "steps_detail": [
+        {
+          "step": 1,
+          "action": "calculate",
+          "args": {
+            "expression": "256 * 48 + 100"
+          },
+          "observation": "256 * 48 + 100 = 12388",
+          "raw_response": "Action: calculate(expression=\"256 * 48 + 100\")\n"
+        },
+        {
+          "step": 2,
+          "action": null,
+          "args": {},
+          "observation": null,
+          "raw_response": "Answer: 256 * 48 + 100 = 12388"
+        }
+      ],
+      "execution_successful": true,
+      "expected_tools": [
+        "calculate"
+      ],
+      "called_tools": [
+        "calculate"
+      ],
+      "missing_tools": [],
+      "unexpected_tools": [],
+      "answer_patterns": [
+        "12388"
+      ],
+      "missing_answer_patterns": [],
+      "quality_issues": [],
+      "quality_passed": true
+    },
+    {
+      "query_index": 3,
+      "query": "Какой текущий курс доллара к рублю?",
+      "model": "maple",
+      "model_name": "Maple-Preview 20B-A1B",
+      "final_answer": "",
+      "steps_count": 3,
+      "total_time_sec": 16.65,
+      "steps_detail": [
+        {
+          "step": 1,
+          "action": "get_exchange_rate",
+          "args": {
+            "pair": "USD"
+          },
+          "observation": "1 USD = 92.40 RUB",
+          "raw_response": "Action: get_exchange_rate(pair=\"USD\")\n"
+        },
+        {
+          "step": 2,
+          "action": "get_current_time",
+          "args": {},
+          "observation": "Текущее время: 12:30:00 (MSK, UTC+3), дата: 09 октября 2026 года",
+          "raw_response": "Action: get_current_time()\n"
+        },
+        {
+          "step": 3,
+          "action": null,
+          "args": {},
+          "observation": null,
+          "raw_response": ""
+        }
+      ],
+      "execution_successful": true,
+      "expected_tools": [
+        "get_exchange_rate"
+      ],
+      "called_tools": [
+        "get_exchange_rate",
+        "get_current_time"
+      ],
+      "missing_tools": [],
+      "unexpected_tools": [
+        "get_current_time"
+      ],
+      "answer_patterns": [
+        "92[.,]40"
+      ],
+      "missing_answer_patterns": [
+        "92[.,]40"
+      ],
+      "quality_issues": [
+        "Пустой итоговый ответ",
+        "Лишние вызовы инструментов: get_current_time",
+        "В ответе нет ожидаемых результатов: 92[.,]40"
+      ],
+      "quality_passed": false
+    },
+    {
+      "query_index": 4,
+      "query": "Который сейчас час?",
+      "model": "maple",
+      "model_name": "Maple-Preview 20B-A1B",
+      "final_answer": "Ответ: Сейчас 12:30 по московскому времени, 09 октября 2026 года.",
+      "steps_count": 2,
+      "total_time_sec": 8.32,
+      "steps_detail": [
+        {
+          "step": 1,
+          "action": "get_current_time",
+          "args": {},
+          "observation": "Текущее время: 12:30:00 (MSK, UTC+3), дата: 09 октября 2026 года",
+          "raw_response": "Action: get_current_time()\n"
+        },
+        {
+          "step": 2,
+          "action": null,
+          "args": {},
+          "observation": null,
+          "raw_response": "Ответ: Сейчас 12:30 по московскому времени, 09 октября 2026 года."
+        }
+      ],
+      "execution_successful": true,
+      "expected_tools": [
+        "get_current_time"
+      ],
+      "called_tools": [
+        "get_current_time"
+      ],
+      "missing_tools": [],
+      "unexpected_tools": [],
+      "answer_patterns": [
+        "12:30"
+      ],
+      "missing_answer_patterns": [],
+      "quality_issues": [],
+      "quality_passed": true
+    },
+    {
+      "query_index": 5,
+      "query": "Какой статус кондиционера?",
+      "model": "maple",
+      "model_name": "Maple-Preview 20B-A1B",
+      "final_answer": "Кондиционер включен в режим охлаждения, целевая температура 21°C.",
+      "steps_count": 2,
+      "total_time_sec": 6.37,
+      "steps_detail": [
+        {
+          "step": 1,
+          "action": "get_device_status",
+          "args": {
+            "device": "кондиционер"
+          },
+          "observation": "Кондиционер: ВКЛЮЧЕН, режим Охлаждение, целевая температура 21°C",
+          "raw_response": "Action: get_device_status(device=\"кондиционер\")"
+        },
+        {
+          "step": 2,
+          "action": null,
+          "args": {},
+          "observation": null,
+          "raw_response": "Answer: Кондиционер включен в режим охлаждения, целевая температура 21°C."
+        }
+      ],
+      "execution_successful": true,
+      "expected_tools": [
+        "get_device_status"
+      ],
+      "called_tools": [
+        "get_device_status"
+      ],
+      "missing_tools": [],
+      "unexpected_tools": [],
+      "answer_patterns": [
+        "21\\s*°?C"
+      ],
+      "missing_answer_patterns": [],
+      "quality_issues": [],
+      "quality_passed": true
+    },
+    {
+      "query_index": 6,
+      "query": "Привет! Расскажи кратко, что такое нейронная сеть.",
+      "model": "maple",
+      "model_name": "Maple-Preview 20B-A1B",
+      "final_answer": "Нейронная сеть — это вычислительная модель, вдохновленная биологическими нейронами. Она состоит из слоёв нейронов, которые обрабатывают данные через весовые коэффициенты и применяют функции активации. Сеть обучается на примерах, чтобы автоматически находить закономерности и делать предсказания.",
+      "steps_count": 1,
+      "total_time_sec": 4.71,
+      "steps_detail": [
+        {
+          "step": 1,
+          "action": null,
+          "args": {},
+          "observation": null,
+          "raw_response": "Нейронная сеть — это вычислительная модель, вдохновленная биологическими нейронами. Она состоит из слоёв нейронов, которые обрабатывают данные через весовые коэффициенты и применяют функции активации. Сеть обучается на примерах, чтобы автоматически находить закономерности и делать предсказания."
+        }
+      ],
+      "execution_successful": true,
+      "expected_tools": [],
+      "called_tools": [],
+      "missing_tools": [],
+      "unexpected_tools": [],
+      "answer_patterns": [],
+      "missing_answer_patterns": [],
+      "quality_issues": [],
+      "quality_passed": true
+    },
+    {
+      "query_index": 7,
+      "query": "Какая погода в Токио и какой курс евро?",
+      "model": "maple",
+      "model_name": "Maple-Preview 20B-A1B",
+      "final_answer": "Погода в Токио: +22°C, солнечно. Курс евро: 1 EUR = 100.85 RUB.",
+      "steps_count": 3,
+      "total_time_sec": 14.21,
+      "steps_detail": [
+        {
+          "step": 1,
+          "action": "get_weather",
+          "args": {
+            "city": "Токио"
+          },
+          "observation": "Погода в городе Токио: +22°C, солнечно",
+          "raw_response": "Action: get_weather(city=\"Токио\")\n"
+        },
+        {
+          "step": 2,
+          "action": "get_exchange_rate",
+          "args": {
+            "pair": "EUR"
+          },
+          "observation": "1 EUR = 100.85 RUB",
+          "raw_response": "Action: get_exchange_rate(pair=\"EUR\")\n"
+        },
+        {
+          "step": 3,
+          "action": null,
+          "args": {},
+          "observation": null,
+          "raw_response": "Action: Answer: Погода в Токио: +22°C, солнечно. Курс евро: 1 EUR = 100.85 RUB."
+        }
+      ],
+      "execution_successful": true,
+      "expected_tools": [
+        "get_weather",
+        "get_exchange_rate"
+      ],
+      "called_tools": [
+        "get_weather",
+        "get_exchange_rate"
+      ],
+      "missing_tools": [],
+      "unexpected_tools": [],
+      "answer_patterns": [
+        "\\+22\\s*°?C",
+        "100[.,]85"
+      ],
+      "missing_answer_patterns": [],
+      "quality_issues": [],
+      "quality_passed": true
+    },
+    {
+      "query_index": 8,
+      "query": "Посчитай 15% от 8500",
+      "model": "maple",
+      "model_name": "Maple-Preview 20B-A1B",
+      "final_answer": "15% от 8500 — это 1275.",
+      "steps_count": 2,
+      "total_time_sec": 12.79,
+      "steps_detail": [
+        {
+          "step": 1,
+          "action": "calculate",
+          "args": {
+            "expression": "8500 * 15 / 100"
+          },
+          "observation": "8500 * 15 / 100 = 1275.0",
+          "raw_response": "Action: calculate(expression=\"8500 * 15 / 100\")\n"
+        },
+        {
+          "step": 2,
+          "action": null,
+          "args": {},
+          "observation": null,
+          "raw_response": "Answer: 15% от 8500 — это 1275."
+        }
+      ],
+      "execution_successful": true,
+      "expected_tools": [
+        "calculate"
+      ],
+      "called_tools": [
+        "calculate"
+      ],
+      "missing_tools": [],
+      "unexpected_tools": [],
+      "answer_patterns": [
+        "1275(?:[.,]0+)?"
+      ],
+      "missing_answer_patterns": [],
+      "quality_issues": [],
+      "quality_passed": true
+    }
+  ]
+}
