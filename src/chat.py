@@ -1,18 +1,8 @@
-"""
-Interactive Console REPL Chat.
-Fulfills Requirement 3 & Requirement 4:
-- Консольный чат в терминале
-- История сообщений между репликами
-- Стриминг ответа
-- Вызов инструментов (tools) и отображение шагов рассуждения
-- Корректный выход (/exit, /quit, Ctrl+C)
-"""
 import sys
 import time
 from typing import List, Dict, Optional
 from pathlib import Path
 
-# Configure UTF-8 for Windows console
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -25,7 +15,6 @@ from src.providers.llama_provider import LlamaCppProvider
 from src.providers.maple_server_provider import MapleServerProvider
 from src.agent import ToolAgent
 from src.tools import TOOLS_REGISTRY
-
 
 class ConsoleREPLChat:
     def __init__(
@@ -99,7 +88,6 @@ class ConsoleREPLChat:
             if not user_input:
                 continue
 
-            # Check slash commands
             cmd = user_input.lower()
             if cmd in ["/exit", "/quit", "exit", "quit", ":q"]:
                 print("\n[Выход] Завершение сеанса чата. До свидания!")
@@ -127,14 +115,12 @@ class ConsoleREPLChat:
                 print(f"[Инфо] Режим инструментов переключен: {'ВКЛЮЧЕН' if self.enable_tools else 'ВЫКЛЮЧЕН'}")
                 continue
 
-            # Process prompt
             if self.enable_tools:
                 self._handle_agent_query(user_input)
             else:
                 self._handle_direct_query(user_input)
 
     def _handle_direct_query(self, user_input: str):
-        """Direct LLM chat with streaming, no tool execution."""
         self.history.append({"role": "user", "content": user_input})
         messages = [
             {"role": "system", "content": "Ты полезный и вежливый AI-ассистент. Отвечай на русском языке."}
@@ -152,7 +138,6 @@ class ConsoleREPLChat:
             print("\n[Прервано пользователем]")
 
     def _handle_agent_query(self, user_input: str):
-        """Tool Agent query with tool execution and step logs."""
         print("\n[Ассистент думает...]")
 
         assistant_started = False
@@ -183,7 +168,6 @@ class ConsoleREPLChat:
                 print(f"\n[Ассистент] > {final_text}")
             print(f"⏱️  (Время: {res['total_time']:.2f} сек, шагов: {len(res['steps'])})")
 
-            # Update history
             self.history.append({"role": "user", "content": user_input})
             self.history.append({"role": "assistant", "content": final_text})
 

@@ -1,11 +1,3 @@
-"""
-ReAct Tool Agent implementation.
-Requirements:
-- На базе чата сделать агента, который парсит вызовы функций прямо из тела ответа.
-- Без function calling, tools calling, MCP.
-- Функции — захардкоженные константы (погода, время, курсы и т.п.).
-- Поддержка стриминга и подробного логирования шагов.
-"""
 import time
 import re
 import json
@@ -14,20 +6,66 @@ from src.providers.base import BaseLLMProvider
 from src.tools import execute_tool
 from src.parser import ToolCallParser
 from src.prompt_templates import build_system_prompt
-
+from src.file_fact_memory import FileFactMemory
+from src.display_cell import render_cell
 
 class ToolAgent:
     def __init__(
         self,
-        provider: BaseLLMProvider,
+        provider: Optional[BaseLLMProvider] = None,
         max_steps: int = 5,
         system_prompt: Optional[str] = None,
-        verbose: bool = True
+        verbose: bool = True,
+        session_id: str = "default_user",
+        file_path: str = "memory.json",
+        memory: Optional[FileFactMemory] = None,
+        show_cell: bool = True
     ):
         self.provider = provider
         self.max_steps = max_steps
-        self.system_prompt = system_prompt or build_system_prompt()
+        self.base_system_prompt = system_prompt or build_system_prompt()
         self.verbose = verbose
+        self.show_cell = show_cell
+
+        if memory is not None:
+            self.memory = memory
+        else:
+            self.memory = FileFactMemory(session_id=session_id, file_path=file_path, show_service_cell=show_cell)
+
+    def get_greeting(self) -> str:
+        known = self.memory.facts
+        name = known.get("name")
+
+        summary_payload = {
+            "Сессия": self.memory.session_id,
+            "Файл памяти": self.memory.file_path,
+            "Пользователь": name if name else "Не указан",
+            "Сохранённые факты": self.memory.format_facts_string()
+        }
+        if self.show_cell:
+            render_cell(
+                title="СТАРТ СЕССИИ: ЗАГРУЗКА ПАМЯТИ ИЗ ФАЙЛА",
+                content=summary_payload,
+                border_style="bold blue",
+                subtitle=f"Файл: {self.memory.file_path}"
+            )
+
+        if name:
+            known_items = []
+            for k, v in known.items():
+                if k != "name":
+                    known_items.append(f"{k}: {v}")
+            details = f" ({', '.join(known_items)})" if known_items else ""
+            return f"Привет, {name}! Рад снова быть на связи{details}. Чем могу помочь тебе сегодня?"
+        else:
+            return "Привет! Я твой личный ассистент. Я запоминаю важные факты о тебе в файл memory.json, умею узнавать цены криптовалют (BTC, ETH), акций российских компаний (Сбер, Газпром, Яндекс) и помогать с задачами. Как к тебе обращаться?"
+
+    def build_context_system_prompt(self) -> str:
+        facts_text = self.memory.format_facts_string()
+        prompt = self.base_system_prompt
+        prompt += f"\n\nИзвестные долговременные факты о пользователе из файла памяти:\n{facts_text}\n"
+        prompt += "Учитывай эти факты при ответах. Если пользователь спрашивает о себе, используй эти данные точно.\n"
+        return prompt
 
     def run(
         self,
@@ -36,33 +74,21 @@ class ToolAgent:
         on_token_callback: Optional[Callable[[str], None]] = None,
         on_tool_callback: Optional[Callable[[str, Dict[str, Any], str], None]] = None,
     ) -> Dict[str, Any]:
-        """
-        Executes the ReAct loop for a user query.
-        Returns detailed execution log dictionary:
-        {
-            "user_message": ...,
-            "steps": [ ... ],
-            "final_answer": ...,
-            "total_time": ...,
-            "model": ...
-        }
-        """
         start_time = time.time()
         history = list(conversation_history or [])
-        # Build working messages for the current ReAct cycle
+
+        self.memory.save_context({"input": user_message}, {"output": ""})
+
+        system_prompt = self.build_context_system_prompt()
         messages: List[Dict[str, str]] = [
-            {"role": "system", "content": self.system_prompt}
+            {"role": "system", "content": system_prompt}
         ]
-        # Include past turns
         messages.extend(history)
-        # Add current user query
         messages.append({"role": "user", "content": user_message})
 
         step_logs = []
         final_answer = ""
         current_step = 0
-
-        # Stop words to prevent model from hallucinating observations
         stop_tokens = ["Observation:", "\nObservation:", "[Observation:"]
 
         while current_step < self.max_steps:
@@ -76,8 +102,6 @@ class ToolAgent:
                 "raw_response": ""
             }
 
-            # Stream each model turn, but show only the final Answer to the user.
-            # Action/Thought text stays hidden while the agent is deciding or calling tools.
             raw_chunks = []
             stream_buffer = ""
             answer_streaming = False
@@ -85,44 +109,74 @@ class ToolAgent:
             answer_marker = re.compile(r"(?im)^[ \t]*Answer[ \t]*:[ \t]*")
             action_marker = re.compile(r"(?im)^[ \t]*(?:Action|Вызов|Tool)[ \t]*:")
 
-            for chunk in self.provider.stream_generate(
-                messages=messages,
-                temperature=0.2,
-                max_tokens=getattr(self.provider, "max_tokens", 600),
-                stop=stop_tokens
-            ):
-                raw_chunks.append(chunk)
-                if not on_token_callback:
-                    continue
-                if answer_streaming:
-                    on_token_callback(chunk)
-                    continue
+            if self.provider:
+                for chunk in self.provider.stream_generate(
+                    messages=messages,
+                    temperature=0.2,
+                    max_tokens=getattr(self.provider, "max_tokens", 600),
+                    stop=stop_tokens
+                ):
+                    raw_chunks.append(chunk)
+                    if not on_token_callback:
+                        continue
+                    if answer_streaming:
+                        on_token_callback(chunk)
+                        continue
 
-                stream_buffer += chunk
-                answer_match = answer_marker.search(stream_buffer)
-                action_match = action_marker.search(stream_buffer)
-                if action_match and (not answer_match or action_match.start() < answer_match.start()):
-                    action_before_answer = True
-                if answer_match and not action_before_answer:
-                    answer_streaming = True
-                    answer_text = stream_buffer[answer_match.end():]
-                    if answer_text:
-                        on_token_callback(answer_text)
+                    stream_buffer += chunk
+                    answer_match = answer_marker.search(stream_buffer)
+                    action_match = action_marker.search(stream_buffer)
+                    if action_match and (not answer_match or action_match.start() < answer_match.start()):
+                        action_before_answer = True
+                    if answer_match and not action_before_answer:
+                        answer_streaming = True
+                        answer_text = stream_buffer[answer_match.end():]
+                        if answer_text:
+                            on_token_callback(answer_text)
 
-            raw_response = "".join(raw_chunks)
+                raw_response = "".join(raw_chunks)
+            else:
+                lowered = user_message.lower()
+                name = self.memory.facts.get("name", "")
+                greeting_name = f", {name}" if name else ""
+
+                if "биткоин" in lowered or "btc" in lowered or "bitcoin" in lowered:
+                    raw_response = 'Action: get_crypto_price(crypto="биткоин")'
+                elif "эфириум" in lowered or "eth" in lowered or "эфир" in lowered:
+                    raw_response = 'Action: get_crypto_price(crypto="эфириум")'
+                elif "сбер" in lowered or "сбербанк" in lowered:
+                    raw_response = 'Action: get_stock_price(ticker="сбер")'
+                elif "газпром" in lowered:
+                    raw_response = 'Action: get_stock_price(ticker="газпром")'
+                elif "яндекс" in lowered:
+                    raw_response = 'Action: get_stock_price(ticker="яндекс")'
+                elif "погода" in lowered:
+                    raw_response = 'Action: get_weather(city="москва")'
+                elif "стек" in lowered:
+                    stack = self.memory.facts.get("stack", "")
+                    raw_response = f"Answer: Твой стек{greeting_name}: {stack}."
+                elif "как меня зовут" in lowered or "кто я" in lowered:
+                    raw_response = f"Answer: Тебя зовут {name}." if name else "Answer: Я пока не знаю твоего имени."
+                elif "зовут" in lowered:
+                    raw_response = f"Answer: Приятно познакомиться{greeting_name}! Я сохранил это в памяти."
+                else:
+                    raw_response = f"Answer: Понял тебя{greeting_name}. Чем ещё могу помочь?"
+
             step_record["raw_response"] = raw_response
 
-            # Parse action and answer
             func_name, kwargs, thought, answer = ToolCallParser.parse(raw_response)
 
             if func_name:
-                # Handle positional args fallback
                 if "_arg0" in kwargs and len(kwargs) == 1:
                     clean_arg = kwargs["_arg0"]
                     if func_name == "get_weather":
                         kwargs = {"city": clean_arg}
                     elif func_name == "get_exchange_rate":
                         kwargs = {"pair": clean_arg}
+                    elif func_name == "get_crypto_price":
+                        kwargs = {"crypto": clean_arg}
+                    elif func_name == "get_stock_price":
+                        kwargs = {"ticker": clean_arg}
                     elif func_name == "calculate":
                         kwargs = {"expression": clean_arg}
                     elif func_name == "get_device_status":
@@ -131,26 +185,31 @@ class ToolAgent:
                 step_record["action"] = func_name
                 step_record["args"] = kwargs
 
-                # Execute tool
                 observation = execute_tool(func_name, **kwargs)
                 step_record["observation"] = observation
+
+                if self.show_cell:
+                    render_cell(
+                        title=f"ВЫЗОВ ИНСТРУМЕНТА: {func_name.upper()}",
+                        content={"Инструмент": func_name, "Параметры": kwargs, "Результат": observation},
+                        border_style="bold yellow"
+                    )
 
                 if on_tool_callback:
                     on_tool_callback(func_name, kwargs, observation)
 
-                # Record the observation before building the next model prompt.
                 step_logs.append(step_record)
 
-                # Append assistant action and observation to working dialog
-                # We format this cleanly into the context
-                # Keep only the parsed call in history if a model emitted extra lines/actions.
+                if not self.provider:
+                    final_answer = observation
+                    break
+
                 rendered_args = ", ".join(
                     f"{key}={json.dumps(value, ensure_ascii=False)}"
                     for key, value in kwargs.items()
                 )
                 assistant_msg = f"Action: {func_name}({rendered_args})"
 
-                # Append the single executed action and explicit progress to the ReAct dialog.
                 messages.append({"role": "assistant", "content": assistant_msg})
                 completed = "\n".join(
                     f"- {item['action']}({json.dumps(item['args'], ensure_ascii=False, sort_keys=True)}): {item['observation']}"
@@ -161,20 +220,15 @@ class ToolAgent:
                     "content": (
                         f"Исходный запрос пользователя: {user_message}\n"
                         f"Уже выполненные действия и результаты:\n{completed}\n"
-                        "Не повторяй завершённые вызовы. Если исходный запрос содержит другую явно запрошенную категорию, которой ещё нет в результатах, вызови только её инструмент. "
-                        "Если все запрошенные факты уже получены — сразу дай короткий Answer и перенеси значения из результатов точно."
+                        "Не повторяй завершённые вызовы. Если все запрошенные факты уже получены — сразу дай короткий Answer и перенеси значения из результатов точно."
                     ),
                 })
-
                 continue
-
             else:
-                # No tool called -> Model produced direct reasoning and answer
                 step_logs.append(step_record)
                 if answer:
                     final_answer = answer
                 else:
-                    # Clean up "Thought: ..." if present, or use full text
                     clean_text = raw_response.strip()
                     if "Thought:" in clean_text and "\n" in clean_text:
                         lines = clean_text.splitlines()
@@ -183,22 +237,21 @@ class ToolAgent:
                     else:
                         final_answer = clean_text
 
-                # Models that omit the Answer: label still get a visible final reply.
                 if on_token_callback and not answer_streaming and final_answer:
                     on_token_callback(final_answer)
                 break
 
         if not final_answer and step_logs:
-            # Fallback if loop ended after tools without explicit Answer prefix
             last_resp = step_logs[-1]["raw_response"]
             final_answer = last_resp.strip()
 
         elapsed = time.time() - start_time
+        model_name = self.provider.model_name if self.provider else "LocalFastFallback"
 
         return {
             "user_message": user_message,
             "steps": step_logs,
             "final_answer": final_answer,
             "total_time": elapsed,
-            "model": self.provider.model_name
+            "model": model_name
         }

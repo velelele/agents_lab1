@@ -1,15 +1,8 @@
-"""
-Hardcoded tool implementations and registry for the agent.
-Requirements:
-- Без function calling / tools calling / MCP API.
-- Функции — захардкоженные константы (погода, время, курсы и т.п.).
-"""
 import ast
 import operator
 import re
 from typing import Callable, Dict, Any
 
-# Hardcoded constants database
 WEATHER_DATABASE = {
     "москва": "+14°C, переменная облачность, ветер 4 м/с",
     "санкт-петербург": "+11°C, небольшой дождь, ветер 6 м/с",
@@ -35,6 +28,35 @@ RATES_DATABASE = {
     "юань": "1 CNY = 12.75 RUB"
 }
 
+CRYPTO_DATABASE = {
+    "биткоин": "Биткоин (BTC): $94,850.00 (~8,760,000 RUB)",
+    "биток": "Биткоин (BTC): $94,850.00 (~8,760,000 RUB)",
+    "btc": "Биткоин (BTC): $94,850.00 (~8,760,000 RUB)",
+    "bitcoin": "Биткоин (BTC): $94,850.00 (~8,760,000 RUB)",
+    "эфириум": "Эфириум (ETH): $3,280.00 (~303,000 RUB)",
+    "эфир": "Эфириум (ETH): $3,280.00 (~303,000 RUB)",
+    "eth": "Эфириум (ETH): $3,280.00 (~303,000 RUB)",
+    "ethereum": "Эфириум (ETH): $3,280.00 (~303,000 RUB)"
+}
+
+STOCKS_DATABASE = {
+    "сбер": "Акции Сбербанка (SBER): 312.40 RUB",
+    "сбербанк": "Акции Сбербанка (SBER): 312.40 RUB",
+    "sber": "Акции Сбербанка (SBER): 312.40 RUB",
+    "газпром": "Акции Газпрома (GAZP): 134.80 RUB",
+    "gazp": "Акции Газпрома (GAZP): 134.80 RUB",
+    "яндекс": "Акции Яндекса (YDEX): 4210.00 RUB",
+    "yandex": "Акции Яндекса (YDEX): 4210.00 RUB",
+    "ydex": "Акции Яндекса (YDEX): 4210.00 RUB",
+    "лукойл": "Акции Лукойла (LKOH): 7180.00 RUB",
+    "lkoh": "Акции Лукойла (LKOH): 7180.00 RUB",
+    "т-банк": "Акции Т-Банка (TCSG): 2980.50 RUB",
+    "тинькофф": "Акции Т-Банка (TCSG): 2980.50 RUB",
+    "tcsg": "Акции Т-Банка (TCSG): 2980.50 RUB",
+    "роснефть": "Акции Роснефти (ROSN): 512.10 RUB",
+    "rosn": "Акции Роснефти (ROSN): 512.10 RUB"
+}
+
 DEVICES_DATABASE = {
     "свет": "Свет в гостиной: ВКЛЮЧЕН, яркость 75%",
     "освещение": "Свет в гостиной: ВКЛЮЧЕН, яркость 75%",
@@ -43,33 +65,38 @@ DEVICES_DATABASE = {
     "пылесос": "Робот-пылесос: На зарядной станции, батарея 100%"
 }
 
-
 def get_weather(city: str) -> str:
-    """Возвращает текущую погоду для указанного города."""
     normalized = city.strip().lower()
     for key, value in WEATHER_DATABASE.items():
         if key in normalized or normalized in key:
             return f"Погода в городе {city.strip()}: {value}"
     return f"Погода в городе {city.strip()}: +16°C, переменная облачность, давление 750 мм рт. ст."
 
-
 def get_current_time(timezone: str = "Europe/Moscow") -> str:
-    """Возвращает текущее системное время."""
-    # Захардкоженное фиксированное эталонное время для стабильности тестов/инференса
     return "Текущее время: 12:30:00 (MSK, UTC+3), дата: 09 октября 2026 года"
 
-
 def get_exchange_rate(pair: str) -> str:
-    """Возвращает захардкоженный курс валюты (например: USD, EUR, CNY)."""
     normalized = pair.strip().lower()
     for key, val in RATES_DATABASE.items():
         if key in normalized:
             return val
     return f"Курс для пары '{pair}': 1 {pair.upper()} = 90.00 RUB"
 
+def get_crypto_price(crypto: str) -> str:
+    normalized = crypto.strip().lower()
+    for key, val in CRYPTO_DATABASE.items():
+        if key in normalized or normalized in key:
+            return val
+    return f"Курс криптовалюты '{crypto}': $94,850.00 (~8,760,000 RUB)"
+
+def get_stock_price(ticker: str) -> str:
+    normalized = ticker.strip().lower()
+    for key, val in STOCKS_DATABASE.items():
+        if key in normalized or normalized in key:
+            return val
+    return f"Цена акций '{ticker}': 312.40 RUB"
 
 def calculate(expression: str) -> str:
-    """Безопасный калькулятор базовых арифметических выражений."""
     allowed_operators = {
         ast.Add: operator.add,
         ast.Sub: operator.sub,
@@ -108,17 +135,13 @@ def calculate(expression: str) -> str:
     except Exception as e:
         return f"Ошибка вычисления выражения '{expression}': {e}"
 
-
 def get_device_status(device: str) -> str:
-    """Возвращает состояние устройства умного дома."""
     normalized = device.strip().lower()
     for key, val in DEVICES_DATABASE.items():
         if key in normalized:
             return val
     return f"Статус устройства '{device}': Устройство в сети, работает нормально"
 
-
-# Реестр доступных инструментов
 TOOLS_REGISTRY: Dict[str, Dict[str, Any]] = {
     "get_weather": {
         "func": get_weather,
@@ -135,6 +158,16 @@ TOOLS_REGISTRY: Dict[str, Dict[str, Any]] = {
         "description": "get_exchange_rate(pair=\"USD\") — получить курс валюты к рублю (USD, EUR, CNY)",
         "params": ["pair"]
     },
+    "get_crypto_price": {
+        "func": get_crypto_price,
+        "description": "get_crypto_price(crypto=\"биткоин\") — узнать цену криптовалюты (биткоин, эфириум)",
+        "params": ["crypto"]
+    },
+    "get_stock_price": {
+        "func": get_stock_price,
+        "description": "get_stock_price(ticker=\"сбер\") — узнать цену акций российской компании (Сбербанк, Газпром, Яндекс, Лукойл, Т-Банк, Роснефть)",
+        "params": ["ticker"]
+    },
     "calculate": {
         "func": calculate,
         "description": "calculate(expression=\"2 + 2 * 2\") — посчитать математическое выражение",
@@ -147,17 +180,13 @@ TOOLS_REGISTRY: Dict[str, Dict[str, Any]] = {
     }
 }
 
-
 def get_tools_prompt_text() -> str:
-    """Формирует текстовое описание инструментов для системного промта."""
     lines = ["Тебе доступны следующие инструменты (функции):"]
     for name, tool_info in TOOLS_REGISTRY.items():
         lines.append(f"- {tool_info['description']}")
     return "\n".join(lines)
 
-
 def execute_tool(func_name: str, **kwargs) -> str:
-    """Выполняет инструмент по имени и возвращает результат в виде строки."""
     if func_name not in TOOLS_REGISTRY:
         return f"Ошибка: неизвестная функция '{func_name}'. Доступны: {', '.join(TOOLS_REGISTRY.keys())}"
 
@@ -166,9 +195,7 @@ def execute_tool(func_name: str, **kwargs) -> str:
         result = func(**kwargs)
         return str(result)
     except TypeError as e:
-        # Если аргументы переданы не под теми именами или без имен
         try:
-            # Попробуем передать первый позиционный аргумент
             if kwargs and len(kwargs) == 1:
                 val = next(iter(kwargs.values()))
                 return str(func(val))

@@ -1,16 +1,8 @@
-"""
-Local Llama.cpp provider using llama-cpp-python.
-Supports:
-- Running GGUF models directly on CPU / GPU
-- Synchronous generation and token-by-token streaming
-- Custom stop tokens (e.g. 'Observation:' to prevent hallucinating tool outputs)
-"""
 from pathlib import Path
 from typing import Generator, List, Dict, Optional, Union
 import llama_cpp
 from src.providers.base import BaseLLMProvider
 from src.config import DEFAULT_CTX_SIZE, DEFAULT_N_THREADS, DEFAULT_TEMPERATURE
-
 
 class LlamaCppProvider(BaseLLMProvider):
     def __init__(
@@ -40,9 +32,7 @@ class LlamaCppProvider(BaseLLMProvider):
         if chat_format:
             kwargs["chat_format"] = chat_format
 
-        print(f"[+] Инициализация llama-cpp модели '{self._model_alias}' ({self.model_path.name})...")
         self.llm = llama_cpp.Llama(**kwargs)
-        print(f"[OK] Модель '{self._model_alias}' успешно загружена в память.")
 
     @property
     def model_name(self) -> str:

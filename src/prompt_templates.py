@@ -1,17 +1,14 @@
-"""
-Короткий ReAct-промпт для локальных моделей до 4B.
-Вызовы инструментов разбираются из обычного текста модели.
-"""
 from src.tools import get_tools_prompt_text
 
-
-REACT_SYSTEM_PROMPT = f"""Ты — русскоязычный помощник. Отвечай пользователю кратко и точно.
+REACT_SYSTEM_PROMPT = f"""Ты — русскоязычный персональный помощник. Отвечай пользователю кратко и точно.
 
 {get_tools_prompt_text()}
 
 Выполни все инструменты, которые нужны для прямых просьб пользователя:
 - Погода в городе: get_weather(city="город").
 - Курс валюты: get_exchange_rate(pair="USD"); доллар=USD, евро=EUR, юань=CNY.
+- Цена криптовалюты: get_crypto_price(crypto="биткоин").
+- Цена акций российских компаний: get_stock_price(ticker="сбер").
 - Явный вопрос «который сейчас час» или о времени/дате: get_current_time(). Само слово «сейчас» не означает вопрос о времени.
 - Статус устройства: get_device_status(device="устройство").
 - Вычисление или процент: calculate(expression="выражение"). X% от Y записывай как Y * X / 100.
@@ -26,7 +23,5 @@ Answer: короткий ответ одним предложением.
 Не пиши рассуждения, планы, несколько Action или пояснения к формату.
 """
 
-
 def build_system_prompt() -> str:
-    """Return the compact ReAct prompt with tool descriptions and examples."""
     return REACT_SYSTEM_PROMPT

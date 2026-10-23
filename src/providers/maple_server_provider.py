@@ -1,20 +1,14 @@
-"""Maple Preview provider using a local llama.cpp HTTP server."""
 import atexit
 import json
 import subprocess
 import time
 from pathlib import Path
 from typing import Dict, Generator, List, Optional
-
 import requests
-
 from src.config import BASE_DIR
 from src.providers.base import BaseLLMProvider
 
-
 class MapleServerProvider(BaseLLMProvider):
-    """Run Maple-Preview through the official Windows CPU llama.cpp runtime."""
-
     def __init__(
         self,
         model_path: Path,
@@ -80,7 +74,6 @@ class MapleServerProvider(BaseLLMProvider):
             self.close()
             raise TimeoutError(f"llama-server не загрузил Maple за {startup_timeout} с. Лог:\n{details}")
 
-        print(f"[OK] Maple-Preview загружен локально: {self.model_path.name}")
         atexit.register(self.close)
 
     def _tail_log(self) -> str:

@@ -1,16 +1,7 @@
-"""
-main.py — Точка входа для лабораторной работы.
-Запускает консольный REPL-чат с ассистентом на локальных LLM (llama-cpp).
-
-Использование:
-    python main.py                       # Qwen 2.5 3B + tools
-    python main.py --model llama         # Llama 3.2 3B + tools
-    python main.py --model qwen --no-tools  # Без инструментов (простой чат)
-"""
 import sys
 import argparse
+from pathlib import Path
 
-# UTF-8 for Windows
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -18,46 +9,63 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-from src.chat import ConsoleREPLChat
-
+from src.agent import ToolAgent
+from src.file_fact_memory import FileFactMemory
+from src.providers.llama_provider import LlamaCppProvider
+from src.config import LOCAL_MODELS
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Консольный ассистент с инструментами на локальных LLM (Lab 1)"
-    )
-    parser.add_argument(
-        "--model",
-        choices=["qwen", "llama", "maple"],
-        default="qwen",
-        help="Какую локальную модель использовать (default: qwen)"
-    )
-    parser.add_argument(
-        "--no-tools",
-        action="store_true",
-        help="Отключить режим инструментов (простой чат со стримингом)"
-    )
+    parser = argparse.ArgumentParser(description="Личный ассистент с памятью в файле")
+    parser.add_argument("--session", default="default_user", help="ID сессии / профиля")
+    parser.add_argument("--file", default="memory.json", help="Путь к файлу памяти")
+    parser.add_argument("--model", choices=["qwen", "llama", "maple", "none"], default="qwen", help="Модель")
+    parser.add_argument("--clear", action="store_true", help="Очистить память сессии перед запуском")
     args = parser.parse_args()
 
-    chat = None
-    try:
-        chat = ConsoleREPLChat(
-            model_key=args.model,
-            enable_tools=not args.no_tools
-        )
-        chat.run_repl()
-    except FileNotFoundError as e:
-        print(f"\n[ОШИБКА] {e}")
-        print("Скачайте модель командой: python scripts/download_models.py")
-        sys.exit(1)
-    except KeyboardInterrupt:
-        print("\n\nДо свидания!")
-        sys.exit(0)
-    finally:
-        provider = getattr(chat, "provider", None)
-        close = getattr(provider, "close", None)
-        if close:
-            close()
+    memory = FileFactMemory(file_path=args.file, session_id=args.session, show_service_cell=True)
+    if args.clear:
+        memory.clear()
 
+    provider = None
+    if args.model != "none" and args.model in LOCAL_MODELS:
+        info = LOCAL_MODELS[args.model]
+        if info["path"].exists():
+            provider = LlamaCppProvider(
+                model_path=info["path"],
+                model_alias=args.model,
+                chat_format=info["chat_format"]
+            )
+
+    agent = ToolAgent(
+        provider=provider,
+        memory=memory,
+        session_id=args.session,
+        file_path=args.file,
+        show_cell=True
+    )
+
+    greeting = agent.get_greeting()
+    print(f"\nАссистент: {greeting}\n")
+
+    history = []
+    while True:
+        try:
+            user_input = input("Вы: ").strip()
+            if not user_input:
+                continue
+            if user_input.lower() in ["exit", "quit", "q", "выход"]:
+                print(f"\nАссистент: До встречи! Все факты надёжно сохранены в {args.file}.\n")
+                break
+
+            result = agent.run(user_input, conversation_history=history)
+            answer = result["final_answer"]
+            history.append({"role": "user", "content": user_input})
+            history.append({"role": "assistant", "content": answer})
+            print(f"\nАссистент: {answer}\n")
+
+        except (KeyboardInterrupt, EOFError):
+            print(f"\n\nАссистент: Сессия завершена. Память сохранена в {args.file}.\n")
+            break
 
 if __name__ == "__main__":
     main()

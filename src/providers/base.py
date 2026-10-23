@@ -1,9 +1,5 @@
-"""
-Abstract base class for LLM providers.
-"""
 from abc import ABC, abstractmethod
 from typing import Generator, List, Dict, Any, Optional
-
 
 class BaseLLMProvider(ABC):
     @abstractmethod
@@ -14,7 +10,6 @@ class BaseLLMProvider(ABC):
         max_tokens: int = 1024,
         stop: Optional[List[str]] = None,
     ) -> str:
-        """Generate complete response synchronously."""
         pass
 
     @abstractmethod
@@ -25,11 +20,9 @@ class BaseLLMProvider(ABC):
         max_tokens: int = 1024,
         stop: Optional[List[str]] = None,
     ) -> Generator[str, None, None]:
-        """Stream response tokens sequentially."""
         pass
 
     @property
     @abstractmethod
     def model_name(self) -> str:
-        """Name or identifier of the loaded model."""
         pass
