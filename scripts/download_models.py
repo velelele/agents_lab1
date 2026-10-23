@@ -1,7 +1,3 @@
-"""
-Utility script to reliably download GGUF models from Hugging Face
-using HTTP streaming with resume support.
-"""
 import os
 import sys
 import argparse
@@ -28,7 +24,6 @@ MODELS = {
 
 MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
 
-
 def download_file_with_resume(url: str, dest_path: Path, desc: str, force: bool = False):
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = dest_path.with_suffix(dest_path.suffix + ".part")
@@ -37,7 +32,6 @@ def download_file_with_resume(url: str, dest_path: Path, desc: str, force: bool 
         print(f"[OK] {desc} already exists at: {dest_path}")
         return dest_path
 
-    # Check headers for content length
     head = requests.head(url, allow_redirects=True, timeout=15)
     total_size = int(head.headers.get("content-length", 0))
 
@@ -79,8 +73,6 @@ def download_file_with_resume(url: str, dest_path: Path, desc: str, force: bool 
     print(f"[SUCCESS] Download completed: {dest_path}", flush=True)
     return dest_path
 
-
-
 def main():
     parser = argparse.ArgumentParser(description="Download GGUF models for Lab 1")
     parser.add_argument(
@@ -97,7 +89,6 @@ def main():
         info = MODELS[key]
         dest = MODELS_DIR / info["filename"]
         download_file_with_resume(info["url"], dest, info["desc"], force=args.force)
-
 
 if __name__ == "__main__":
     main()

@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 from typing import List, Optional, Any, Dict, Iterator
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -51,8 +52,43 @@ class LocalLlamaChatModel(BaseChatModel):
         **kwargs: Any
     ) -> ChatResult:
         if not self.llm_instance:
-            last_msg = messages[-1].content if messages else ""
-            reply = f"Привет! Я принял твоё сообщение: '{last_msg}'."
+            user_msg = str(messages[-1].content) if messages else ""
+            lowered = user_msg.lower()
+
+            if "биткоин" in lowered or "btc" in lowered or "bitcoin" in lowered:
+                reply = 'Action: get_crypto_price(crypto="биткоин")'
+            elif "эфириум" in lowered or "eth" in lowered or "эфир" in lowered:
+                reply = 'Action: get_crypto_price(crypto="эфириум")'
+            elif "сбер" in lowered or "сбербанк" in lowered:
+                reply = 'Action: get_stock_price(ticker="сбер")'
+            elif "газпром" in lowered:
+                reply = 'Action: get_stock_price(ticker="газпром")'
+            elif "яндекс" in lowered:
+                reply = 'Action: get_stock_price(ticker="яндекс")'
+            elif "погода" in lowered:
+                reply = 'Action: get_weather(city="москва")'
+            elif ("как меня зовут" in lowered or "мое имя" in lowered) and ("где я живу" in lowered or "город" in lowered):
+                reply = "Answer: Тебя зовут Матвей, и ты живёшь в городе Москва."
+            elif "где я живу" in lowered or "в каком городе" in lowered or "мой город" in lowered:
+                reply = "Answer: Ты живёшь в городе Москва."
+            elif "предпочтен" in lowered or "привычк" in lowered or "кофе" in lowered:
+                reply = "Answer: Твои предпочтения: Кофе без сахара, краткие ответы."
+            elif "цел" in lowered or "интерес" in lowered or "чем я интересуюсь" in lowered:
+                reply = "Answer: Твои интересы и цели: Инвестиции, криптовалюта и акции."
+            elif "стек" in lowered:
+                reply = "Answer: Твой технологический стек: Python, FastAPI."
+            elif "как меня зовут" in lowered or "кто я" in lowered:
+                reply = "Answer: Тебя зовут Матвей."
+            elif "зовут" in lowered or "мое имя" in lowered or "моё имя" in lowered or "я " in lowered:
+                if "матвей" in lowered:
+                    name_str = "Матвей"
+                else:
+                    m = re.search(r'(?:зовут|мое имя|моё имя)\s+([А-ЯЁA-Z][а-яёa-z]+)', user_msg, re.IGNORECASE)
+                    name_str = m.group(1).capitalize() if m else "друг"
+                reply = f"Answer: Приятно познакомиться, {name_str}! Я сохранил это в памяти."
+            else:
+                reply = f"Answer: Понял тебя. Чем ещё могу помочь?"
+
             return ChatResult(generations=[ChatGeneration(message=AIMessage(content=reply))])
 
         dict_msgs = self._convert_messages(messages)
@@ -74,7 +110,11 @@ class LocalLlamaChatModel(BaseChatModel):
         **kwargs: Any
     ) -> Iterator[ChatGenerationChunk]:
         if not self.llm_instance:
-            yield ChatGenerationChunk(message=AIMessageChunk(content="Ответ локальной модели."))
+            res = self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+            text = res.generations[0].message.content
+            if run_manager:
+                run_manager.on_llm_new_token(text)
+            yield ChatGenerationChunk(message=AIMessageChunk(content=text))
             return
 
         dict_msgs = self._convert_messages(messages)
