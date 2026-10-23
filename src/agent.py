@@ -152,6 +152,18 @@ class ToolAgent:
                     raw_response = 'Action: get_stock_price(ticker="яндекс")'
                 elif "погода" in lowered:
                     raw_response = 'Action: get_weather(city="москва")'
+                elif ("как меня зовут" in lowered or "мое имя" in lowered) and ("где я живу" in lowered or "город" in lowered):
+                    city = self.memory.facts.get("city", "Москва")
+                    raw_response = f"Answer: Тебя зовут {name}, и ты живёшь в городе {city}."
+                elif "где я живу" in lowered or "в каком городе" in lowered or "мой город" in lowered:
+                    city = self.memory.facts.get("city", "Москва")
+                    raw_response = f"Answer: Ты живёшь в городе {city}{greeting_name}."
+                elif "предпочтен" in lowered or "привычк" in lowered or "кофе" in lowered:
+                    prefs = self.memory.facts.get("preferences", "не указаны")
+                    raw_response = f"Answer: Твои предпочтения{greeting_name}: {prefs}."
+                elif "цел" in lowered or "интерес" in lowered or "чем я интересуюсь" in lowered:
+                    goals = self.memory.facts.get("goals", "не указаны")
+                    raw_response = f"Answer: Твои интересы и цели{greeting_name}: {goals}."
                 elif "стек" in lowered:
                     stack = self.memory.facts.get("stack", "")
                     raw_response = f"Answer: Твой стек{greeting_name}: {stack}."

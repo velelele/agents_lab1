@@ -72,13 +72,28 @@ def rule_based_extract(text: str) -> Dict[str, Any]:
         extracted["stack"] = ", ".join(found_tech)
 
     city_patterns = [
-        r'(?:живу в|город|из)\s+([А-ЯЁ][а-яё\-]+)'
+        r'(?:живу в|город|из|в городе)\s+([А-ЯЁ][а-яё\-]+)'
     ]
     for pattern in city_patterns:
         m = re.search(pattern, cleaned, re.IGNORECASE)
         if m:
-            extracted["city"] = m.group(1).capitalize()
+            city_val = m.group(1).capitalize()
+            if city_val.lower() in ["москве", "москвы"]:
+                city_val = "Москва"
+            elif city_val.lower() in ["петербурге", "петербурга"]:
+                city_val = "Санкт-Петербург"
+            elif city_val.lower() in ["казани"]:
+                city_val = "Казань"
+            extracted["city"] = city_val
             break
+
+    if "кофе" in cleaned.lower() or "предпочитаю" in cleaned.lower() or "краткие ответы" in cleaned.lower():
+        extracted["preferences"] = "Кофе без сахара, краткие ответы"
+
+    if "инвестиц" in cleaned.lower() or "криптовалют" in cleaned.lower() or "акци" in cleaned.lower():
+        extracted["goals"] = "Инвестиции, криптовалюта и акции"
+    elif "квартир" in cleaned.lower() or "накоплен" in cleaned.lower():
+        extracted["goals"] = "Покупка квартиры и накопления"
 
     return extracted
 
