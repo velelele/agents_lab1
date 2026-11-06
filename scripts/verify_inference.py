@@ -1,13 +1,7 @@
-"""
-Verification script for Requirement 1:
-- Поднять локально модель
-- Убедиться, что инференс работает
-"""
 import sys
 import time
 from pathlib import Path
 
-# Set UTF-8 encoding for Windows console
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
 
@@ -16,7 +10,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.config import LOCAL_MODELS
 from src.providers.llama_provider import LlamaCppProvider
 from src.providers.maple_server_provider import MapleServerProvider
-
 
 def test_model(key: str):
     if key not in LOCAL_MODELS:
@@ -68,11 +61,9 @@ def test_model(key: str):
     print(f"Время генерации: {elapsed:.2f} сек. Сгенерировано чанков: {tokens_count}")
     print(f"==================================================\n")
 
-
 def main():
     target = sys.argv[1] if len(sys.argv) > 1 else "qwen"
     test_model(target)
-
 
 if __name__ == "__main__":
     main()

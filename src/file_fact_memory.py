@@ -13,10 +13,8 @@ from src.fact_extractor import FactExtractor
 
 FACT_KEY_LABELS = {
     "name": "Имя",
-    "role": "Профессия / Роль",
-    "stack": "Технологический стек",
-    "level": "Грейд / Уровень",
     "city": "Город",
+    "interests": "Интересы",
     "goals": "Цели / Задачи",
     "preferences": "Предпочтения"
 }
@@ -76,13 +74,13 @@ class FileFactMemory(BaseChatMemory):
         self._write_all_sessions(all_data)
 
     def format_facts_string(self) -> str:
-        if not self.facts:
-            return "Факты о пользователе пока не известны."
         lines = []
         for key, value in self.facts.items():
-            label = FACT_KEY_LABELS.get(key, key)
+            if key not in FACT_KEY_LABELS:
+                continue
+            label = FACT_KEY_LABELS[key]
             lines.append(f"- {label}: {value}")
-        return "\n".join(lines)
+        return "\n".join(lines) if lines else "Факты о пользователе пока не известны."
 
     def load_memory_variables(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         self.load_from_file()

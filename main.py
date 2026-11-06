@@ -12,6 +12,7 @@ if sys.platform == "win32":
 from src.agent import ToolAgent
 from src.file_fact_memory import FileFactMemory
 from src.providers.llama_provider import LlamaCppProvider
+from src.providers.maple_server_provider import MapleServerProvider
 from src.config import LOCAL_MODELS
 
 def main():
@@ -29,7 +30,11 @@ def main():
     provider = None
     if args.model != "none" and args.model in LOCAL_MODELS:
         info = LOCAL_MODELS[args.model]
-        if info["path"].exists():
+        if not info["path"].exists():
+            parser.error(f"Модель не найдена: {info['path']}")
+        if args.model == "maple":
+            provider = MapleServerProvider(model_path=info["path"], model_alias=args.model)
+        else:
             provider = LlamaCppProvider(
                 model_path=info["path"],
                 model_alias=args.model,
@@ -47,9 +52,8 @@ def main():
     greeting = agent.get_greeting()
     print(f"\nАссистент: {greeting}\n")
 
-    history = []
-    while True:
-        try:
+    try:
+        while True:
             user_input = input("Вы: ").strip()
             if not user_input:
                 continue
@@ -57,15 +61,15 @@ def main():
                 print(f"\nАссистент: До встречи! Все факты надёжно сохранены в {args.file}.\n")
                 break
 
-            result = agent.run(user_input, conversation_history=history)
+            result = agent.run(user_input)
             answer = result["final_answer"]
-            history.append({"role": "user", "content": user_input})
-            history.append({"role": "assistant", "content": answer})
             print(f"\nАссистент: {answer}\n")
 
-        except (KeyboardInterrupt, EOFError):
-            print(f"\n\nАссистент: Сессия завершена. Память сохранена в {args.file}.\n")
-            break
+    except (KeyboardInterrupt, EOFError):
+        print(f"\n\nАссистент: Сессия завершена. Память сохранена в {args.file}.\n")
+    finally:
+        if provider is not None and hasattr(provider, "close"):
+            provider.close()
 
 if __name__ == "__main__":
     main()

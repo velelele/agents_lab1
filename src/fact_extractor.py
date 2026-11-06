@@ -4,98 +4,53 @@ from typing import Dict, Any, Optional
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.language_models.chat_models import BaseChatModel
 
-EXTRACTION_SYSTEM_PROMPT = """Ты — модуль извлечения долговременной памяти для личного ассистента.
-Твоя задача — извлечь из сообщения пользователя любые новые факты о нём.
+FACT_KEYS = {"name", "city", "interests", "goals", "preferences"}
 
-Возможные факты:
-- name: имя пользователя (например "Матвей")
-- role: профессия или род деятельности (например "Backend разработчик", "ML-инженер")
-- stack: технологии, языки программирования, инструменты (например "Python, FastAPI, Docker")
-- level: уровень или грейд (Junior, Middle, Senior, Lead)
-- city: город проживания (например "Москва", "Санкт-Петербург")
-- goals: цели или текущие задачи пользователя
-- preferences: предпочтения пользователя или привычки
+EXTRACTION_SYSTEM_PROMPT = """Ты — модуль долговременной памяти личного ассистента.
+Извлеки только факты, которые пользователь явно сообщил о себе:
+- name: имя
+- city: город проживания
+- interests: интересы пользователя
+- goals: цели пользователя
+- preferences: привычки и предпочтения
 
-Верни ТОЛЬКО валидный JSON-объект с обнаруженными фактами.
-Если фактов нет, верни пустой JSON-объект: {}
+Не делай предположений и не запоминай факты из вопросов как сведения о пользователе.
+Верни только JSON с найденными фактами или пустой объект {}.
 """
+
 
 def rule_based_extract(text: str) -> Dict[str, Any]:
     extracted = {}
     cleaned = text.strip()
 
-    name_patterns = [
-        r'(?:меня зовут|мое имя|моё имя|зовут|я)\s+([А-ЯЁA-Z][а-яёa-z]+)',
-        r'^([А-ЯЁA-Z][а-яёa-z]+)$'
+    name_match = re.search(r"(?:меня зовут|мо[её] имя|зовут меня)\s+([А-ЯЁA-Z][а-яёa-z-]+)", cleaned, re.IGNORECASE)
+    if name_match:
+        extracted["name"] = name_match.group(1).capitalize()
+    elif re.fullmatch(r"[А-ЯЁA-Z][а-яёa-z-]+", cleaned) and cleaned.casefold() not in {"привет", "здравствуйте", "спасибо", "пока", "да", "нет"}:
+        extracted["name"] = cleaned.capitalize()
+
+    city_match = re.search(
+        r"(?:живу|проживаю)\s+в\s+([А-ЯЁA-Zа-яёa-z]+(?:-[А-ЯЁA-Zа-яёa-z]+)*)",
+        cleaned,
+        re.IGNORECASE,
+    )
+    if city_match:
+        city = city_match.group(1)
+        aliases = {"москве": "Москва", "москвы": "Москва", "петербурге": "Санкт-Петербург", "санкт-петербурге": "Санкт-Петербург", "казани": "Казань", "екатеринбурге": "Екатеринбург"}
+        extracted["city"] = aliases.get(city.casefold(), city.capitalize())
+
+    patterns = [
+        ("interests", r"(?:я\s+)?(интересуюсь|мне\s+интересны|мне\s+интересна|мне\s+интересен)\s+([^.!?;]+)"),
+        ("goals", r"(?:моя\s+цель|я\s+планирую|я\s+хочу)\s*(?:это|[:—-])?\s+([^.!?;]+)"),
+        ("preferences", r"(?:я\s+)?(люблю|предпочитаю|мне\s+нравится)\s+([^.!?;]+)"),
     ]
-    for pattern in name_patterns:
-        match = re.search(pattern, cleaned)
+    for key, pattern in patterns:
+        match = re.search(pattern, cleaned, re.IGNORECASE)
         if match:
-            extracted["name"] = match.group(1).capitalize()
-            break
-
-    if "матвей" in cleaned.lower():
-        extracted["name"] = "Матвей"
-
-    level_patterns = [
-        (r'\b(junior\s*\+|джуниор\s*\+|джун\s*\+)\b', "Junior+"),
-        (r'\b(junior|джуниор|джун)\b', "Junior"),
-        (r'\b(middle\s*\+|мидл\s*\+|миддл\s*\+)\b', "Middle+"),
-        (r'\b(middle|мидл|миддл)\b', "Middle"),
-        (r'\b(senior|сеньор|синиор|сеньер)\b', "Senior"),
-        (r'\b(lead|тимлид|лид)\b', "Lead")
-    ]
-    for pattern, label in level_patterns:
-        if re.search(pattern, cleaned, re.IGNORECASE):
-            extracted["level"] = label
-            break
-
-    role_patterns = [
-        (r'\b(backend|бэкенд|бекенд|бек)\b', "Backend разработчик"),
-        (r'\b(frontend|фронтенд|фронт)\b', "Frontend разработчик"),
-        (r'\b(fullstack|фулстек|фуллстек)\b', "Fullstack разработчик"),
-        (r'\b(data\s*scientist|дата\s*саентист|ds)\b', "Data Scientist"),
-        (r'\b(ml\s*engineer|ml-инженер|ml)\b', "ML Engineer"),
-        (r'\b(devops|девопс)\b', "DevOps Engineer")
-    ]
-    for pattern, label in role_patterns:
-        if re.search(pattern, cleaned, re.IGNORECASE):
-            extracted["role"] = label
-            break
-
-    stack_keywords = ["python", "fastapi", "django", "flask", "docker", "postgres", "postgresql", "redis", "langchain", "sql", "git", "linux", "golang", "go", "react"]
-    found_tech = []
-    for tech in stack_keywords:
-        if re.search(r'\b' + re.escape(tech) + r'\b', cleaned, re.IGNORECASE):
-            found_tech.append(tech.title() if tech not in ["sql", "git"] else tech.upper())
-    if found_tech:
-        extracted["stack"] = ", ".join(found_tech)
-
-    city_patterns = [
-        r'(?:живу в|город|из|в городе)\s+([А-ЯЁ][а-яё\-]+)'
-    ]
-    for pattern in city_patterns:
-        m = re.search(pattern, cleaned, re.IGNORECASE)
-        if m:
-            city_val = m.group(1).capitalize()
-            if city_val.lower() in ["москве", "москвы"]:
-                city_val = "Москва"
-            elif city_val.lower() in ["петербурге", "петербурга"]:
-                city_val = "Санкт-Петербург"
-            elif city_val.lower() in ["казани"]:
-                city_val = "Казань"
-            extracted["city"] = city_val
-            break
-
-    if "кофе" in cleaned.lower() or "предпочитаю" in cleaned.lower() or "краткие ответы" in cleaned.lower():
-        extracted["preferences"] = "Кофе без сахара, краткие ответы"
-
-    if "инвестиц" in cleaned.lower() or "криптовалют" in cleaned.lower() or "акци" in cleaned.lower():
-        extracted["goals"] = "Инвестиции, криптовалюта и акции"
-    elif "квартир" in cleaned.lower() or "накоплен" in cleaned.lower():
-        extracted["goals"] = "Покупка квартиры и накопления"
+            extracted[key] = match.group(0).strip().rstrip(", ")
 
     return extracted
+
 
 class FactExtractor:
     def __init__(self, llm: Optional[BaseChatModel] = None):
@@ -107,24 +62,22 @@ class FactExtractor:
             try:
                 response = self.llm.invoke([
                     SystemMessage(content=EXTRACTION_SYSTEM_PROMPT),
-                    HumanMessage(content=f"Сообщение пользователя:\n{user_text}")
+                    HumanMessage(content=f"Сообщение пользователя:\n{user_text}"),
                 ])
                 raw_text = response.content if hasattr(response, "content") else str(response)
                 json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
                 if json_match:
                     parsed = json.loads(json_match.group(0))
                     if isinstance(parsed, dict):
-                        for k, v in parsed.items():
-                            if v and isinstance(v, (str, int, float)):
-                                val_str = str(v).strip()
-                                if val_str and val_str.lower() not in ["null", "none", "unknown", "нет"]:
-                                    result[k] = val_str
+                        for key, value in parsed.items():
+                            if key in FACT_KEYS and value and isinstance(value, (str, int, float)):
+                                value_str = str(value).strip()
+                                if value_str and value_str.casefold() not in ["null", "none", "unknown", "нет"]:
+                                    result[key] = value_str
             except Exception:
                 pass
 
-        rule_facts = rule_based_extract(user_text)
-        for k, v in rule_facts.items():
-            if k not in result or not result[k]:
-                result[k] = v
-
+        for key, value in rule_based_extract(user_text).items():
+            if not result.get(key):
+                result[key] = value
         return result

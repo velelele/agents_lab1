@@ -6,6 +6,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, SystemMessage, AIMessageChunk
 from langchain_core.outputs import ChatResult, ChatGeneration, ChatGenerationChunk
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
+from pydantic import Field
 
 class LocalLlamaChatModel(BaseChatModel):
     model_path: str = ""
@@ -15,10 +16,11 @@ class LocalLlamaChatModel(BaseChatModel):
     n_ctx: int = 2048
     n_threads: int = 4
     llm_instance: Optional[Any] = None
+    provider: Optional[Any] = Field(default=None, exclude=True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        if not self.llm_instance and self.model_path and os.path.exists(self.model_path):
+        if not self.provider and not self.llm_instance and self.model_path and os.path.exists(self.model_path):
             import llama_cpp
             self.llm_instance = llama_cpp.Llama(
                 model_path=self.model_path,
@@ -51,9 +53,21 @@ class LocalLlamaChatModel(BaseChatModel):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any
     ) -> ChatResult:
+        if self.provider is not None:
+            content = self.provider.generate(
+                messages=self._convert_messages(messages), temperature=self.temperature,
+                max_tokens=self.max_tokens, stop=stop
+            )
+            return ChatResult(generations=[ChatGeneration(message=AIMessage(content=content))])
         if not self.llm_instance:
             user_msg = str(messages[-1].content) if messages else ""
             lowered = user_msg.lower()
+            system_text = "\n".join(str(msg.content) for msg in messages if isinstance(msg, SystemMessage))
+            facts = {}
+            for label in ["Имя", "Город", "Интересы", "Цели / Задачи", "Предпочтения"]:
+                match = re.search(r"(?m)^- " + re.escape(label) + r": (.+)$", system_text)
+                if match:
+                    facts[label] = match.group(1).strip()
 
             if "биткоин" in lowered or "btc" in lowered or "bitcoin" in lowered:
                 reply = 'Action: get_crypto_price(crypto="биткоин")'
@@ -68,23 +82,23 @@ class LocalLlamaChatModel(BaseChatModel):
             elif "погода" in lowered:
                 reply = 'Action: get_weather(city="москва")'
             elif ("как меня зовут" in lowered or "мое имя" in lowered) and ("где я живу" in lowered or "город" in lowered):
-                reply = "Answer: Тебя зовут Матвей, и ты живёшь в городе Москва."
+                name = facts.get("Имя", "имя не сохранено")
+                city = facts.get("Город", "город не сохранён")
+                reply = f"Answer: Имя: {name}. Город: {city}."
             elif "где я живу" in lowered or "в каком городе" in lowered or "мой город" in lowered:
-                reply = "Answer: Ты живёшь в городе Москва."
-            elif "предпочтен" in lowered or "привычк" in lowered or "кофе" in lowered:
-                reply = "Answer: Твои предпочтения: Кофе без сахара, краткие ответы."
-            elif "цел" in lowered or "интерес" in lowered or "чем я интересуюсь" in lowered:
-                reply = "Answer: Твои интересы и цели: Инвестиции, криптовалюта и акции."
-            elif "стек" in lowered:
-                reply = "Answer: Твой технологический стек: Python, FastAPI."
+                city = facts.get("Город")
+                reply = f"Answer: Твой город: {city}." if city else "Answer: Я пока не знаю твой город."
+            elif "предпочтен" in lowered or "привычк" in lowered:
+                value = facts.get("Предпочтения")
+                reply = f"Answer: Твои предпочтения: {value}." if value else "Answer: Я пока не знаю твоих предпочтений."
+            elif "цел" in lowered or "интерес" in lowered:
+                values = [facts[key] for key in ["Интересы", "Цели / Задачи"] if key in facts]
+                reply = "Answer: " + "; ".join(values) if values else "Answer: Я пока не знаю твоих интересов и целей."
             elif "как меня зовут" in lowered or "кто я" in lowered:
-                reply = "Answer: Тебя зовут Матвей."
-            elif "зовут" in lowered or "мое имя" in lowered or "моё имя" in lowered or "я " in lowered:
-                if "матвей" in lowered:
-                    name_str = "Матвей"
-                else:
-                    m = re.search(r'(?:зовут|мое имя|моё имя)\s+([А-ЯЁA-Z][а-яёa-z]+)', user_msg, re.IGNORECASE)
-                    name_str = m.group(1).capitalize() if m else "друг"
+                name = facts.get("Имя")
+                reply = f"Answer: Тебя зовут {name}." if name else "Answer: Я пока не знаю твоего имени."
+            elif "зовут" in lowered or "мое имя" in lowered or "моё имя" in lowered:
+                name_str = facts.get("Имя", "друг")
                 reply = f"Answer: Приятно познакомиться, {name_str}! Я сохранил это в памяти."
             else:
                 reply = f"Answer: Понял тебя. Чем ещё могу помочь?"
@@ -109,6 +123,15 @@ class LocalLlamaChatModel(BaseChatModel):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any
     ) -> Iterator[ChatGenerationChunk]:
+        if self.provider is not None:
+            for delta in self.provider.stream_generate(
+                messages=self._convert_messages(messages), temperature=self.temperature,
+                max_tokens=self.max_tokens, stop=stop
+            ):
+                if run_manager:
+                    run_manager.on_llm_new_token(delta)
+                yield ChatGenerationChunk(message=AIMessageChunk(content=delta))
+            return
         if not self.llm_instance:
             res = self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
             text = res.generations[0].message.content
