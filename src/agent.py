@@ -16,6 +16,7 @@ from src.langchain_llm import LocalLlamaChatModel
 from src.dialogue_memory import DialogueMemory
 from src.city_tools import SaveUserCity, extract_requested_city
 from src.request_router import classify_request, weather_city
+from src.rag_knowledge import RAGKnowledgeBase
 
 
 class ToolAgent:
@@ -44,7 +45,7 @@ class ToolAgent:
 
         if provider is not None:
             self.llm = LocalLlamaChatModel(
-                model_alias=getattr(provider, "_model_alias", "local"),
+                model_alias=getattr(provider, "_model_alias", getattr(provider, "model_alias", "local")),
                 provider=provider,
                 temperature=0.2
             )
@@ -52,17 +53,19 @@ class ToolAgent:
             self.llm = LocalLlamaChatModel(model_alias="qwen")
 
         self.dialogue_memory = DialogueMemory(self.llm if provider is not None else None, window_size=window_size)
+        self.knowledge_base = None
         self.city_tool = SaveUserCity(memory=self.memory)
         self.request_branch = RunnableBranch(
             (lambda x: x.get("request_type") == "weather", RunnableLambda(lambda x: f"Запрос о погоде. Используй get_weather и город: {x.get('city', '')}.")),
             (lambda x: x.get("request_type") == "finance", RunnableLambda(lambda _: "Запрос о финансах. Используй подходящий инструмент для акций, криптовалюты или курса.")),
             (lambda x: x.get("request_type") == "news", RunnableLambda(lambda _: "Для новостей нужен подключённый источник.")),
             (lambda x: x.get("request_type") == "mixed", RunnableLambda(lambda _: "Запрос содержит несколько категорий данных.")),
+            (lambda x: x.get("request_type") == "knowledge", RunnableLambda(lambda _: "Ответь кратко и СТРОГО на основе найденных фрагментов базы знаний. Не добавляй выводы, факты, примеры или оценки, которых в них нет. Если фрагменты не отвечают на вопрос, ответь ровно: «В базе знаний ответа нет».")),
             RunnableLambda(lambda _: "Ответь на запрос, используя сохранённые факты, если они нужны.")
         )
 
         prompt_template = ChatPromptTemplate.from_messages([
-            ("system", "{system_prompt}\n\nФакты о пользователе из памяти:\n{facts}\n\nМаршрут запроса: {guidance}\n\n{context}"),
+            ("system", "{system_prompt}\n\nФакты о пользователе из памяти:\n{facts}\n\nМаршрут запроса: {guidance}\n\nКонтекст диалога:\n{context}\n\nФрагменты базы знаний:\n{knowledge_context}"),
             ("human", "{user_message}")
         ])
 
@@ -71,6 +74,7 @@ class ToolAgent:
                 "facts": RunnableLambda(lambda _: self.memory.format_facts_string()),
                 "system_prompt": RunnableLambda(lambda _: self.base_system_prompt),
                 "context": RunnableLambda(lambda x: x.get("context", "")),
+                "knowledge_context": RunnableLambda(lambda x: x.get("knowledge_context", "")),
                 "guidance": RunnableLambda(lambda x: x["guidance"]),
                 "user_message": RunnableLambda(lambda x: x["user_message"]),
             }
@@ -155,6 +159,12 @@ class ToolAgent:
         if conversation_history and not context_str:
             history_lines = [f"{m.get('role', 'user')}: {m.get('content', '')}" for m in conversation_history[-4:]]
             context_str = "Предыдущий контекст:\n" + "\n".join(history_lines)
+        if request_type == "knowledge":
+            if self.knowledge_base is None:
+                self.knowledge_base = RAGKnowledgeBase()
+            knowledge_context = self.knowledge_base.format_context(user_message)
+        else:
+            knowledge_context = "Вопрос не требует поиска по справочным документам."
 
         step_logs = []
         final_answer = ""
@@ -168,6 +178,7 @@ class ToolAgent:
             raw_response = self.chain.invoke({
                 "user_message": current_input,
                 "context": current_context,
+                "knowledge_context": knowledge_context,
                 "guidance": guidance
             })
 

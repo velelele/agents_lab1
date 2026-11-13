@@ -67,6 +67,7 @@ models/
 .runtime/
 *.gguf
 *.bin
+knowledge_db/
 
 # Environment variables
 .env

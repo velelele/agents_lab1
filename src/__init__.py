@@ -1,1 +1,1 @@
-# src package
+__all__ = []
