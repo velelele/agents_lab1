@@ -30,7 +30,8 @@ class ToolAgent:
         file_path: str = "memory.json",
         memory: Optional[FileFactMemory] = None,
         show_cell: bool = True,
-        window_size: int = 2
+        window_size: int = 2,
+        knowledge_base: Optional[RAGKnowledgeBase] = None
     ):
         self.provider = provider
         self.max_steps = max_steps
@@ -53,7 +54,7 @@ class ToolAgent:
             self.llm = LocalLlamaChatModel(model_alias="qwen")
 
         self.dialogue_memory = DialogueMemory(self.llm if provider is not None else None, window_size=window_size)
-        self.knowledge_base = None
+        self.knowledge_base = knowledge_base
         self.city_tool = SaveUserCity(memory=self.memory)
         self.request_branch = RunnableBranch(
             (lambda x: x.get("request_type") == "weather", RunnableLambda(lambda x: f"Запрос о погоде. Используй get_weather и город: {x.get('city', '')}.")),
@@ -152,6 +153,7 @@ class ToolAgent:
                 "total_time": time.time() - start_time,
                 "request_type": request_type,
                 "memory": self.dialogue_memory.load_memory_variables(),
+                "knowledge_context": "",
                 "model": self.llm._llm_type,
             }
 
@@ -264,5 +266,6 @@ class ToolAgent:
             "total_time": elapsed,
             "request_type": request_type,
             "memory": self.dialogue_memory.load_memory_variables(),
+            "knowledge_context": knowledge_context,
             "model": self.llm._llm_type if hasattr(self, "llm") else "LangChainChain"
         }

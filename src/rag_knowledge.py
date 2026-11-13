@@ -1,6 +1,7 @@
 import hashlib
+import re
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from langchain_core.embeddings import Embeddings
 
@@ -40,7 +41,7 @@ class RAGKnowledgeBase:
         self,
         knowledge_dir: Path = KNOWLEDGE_DIR,
         vector_db_dir: Path = VECTOR_DB_DIR,
-        top_k: int = 3,
+        top_k: int = 2,
         min_similarity: float = MIN_RELEVANCE_SCORE,
     ):
         try:
@@ -60,12 +61,42 @@ class RAGKnowledgeBase:
         self.sync_documents()
 
     @staticmethod
-    def _split_text(text: str, chunk_size: int = 900, overlap: int = 120) -> List[str]:
-        normalized = " ".join(text.split())
-        if not normalized:
-            return []
-        step = chunk_size - overlap
-        return [normalized[start:start + chunk_size] for start in range(0, len(normalized), step)]
+    def _split_text(text: str, chunk_size: int = 900) -> List[str]:
+        units = []
+        for paragraph in re.split(r"\n\s*\n", text):
+            paragraph = " ".join(paragraph.split())
+            if paragraph:
+                units.extend(re.split(r"(?<=[.!?])\s+", paragraph))
+
+        chunks = []
+        current = []
+        current_size = 0
+
+        for unit in units:
+            words = unit.split()
+            pieces = []
+            piece = ""
+            for word in words:
+                candidate = f"{piece} {word}".strip()
+                if len(candidate) > chunk_size and piece:
+                    pieces.append(piece)
+                    piece = word
+                else:
+                    piece = candidate
+            if piece:
+                pieces.append(piece)
+
+            for piece in pieces:
+                if current and current_size + len(piece) + 1 > chunk_size:
+                    chunks.append(" ".join(current))
+                    current = []
+                    current_size = 0
+                current.append(piece)
+                current_size += len(piece) + 1
+
+        if current:
+            chunks.append(" ".join(current))
+        return chunks
 
     def _read_documents(self) -> List[dict]:
         documents = []
@@ -121,24 +152,35 @@ class RAGKnowledgeBase:
             ],
         )
 
-    def format_context(self, question: str) -> str:
+    def search(self, question: str, top_k: Optional[int] = None) -> List[dict]:
         count = self.collection.count()
         if not count:
-            return "В базе знаний пока нет документов."
+            return []
 
         result = self.collection.query(
             query_embeddings=[self.embeddings.embed_query(question)],
-            n_results=min(self.top_k, count),
+            n_results=min(top_k or self.top_k, count),
             include=["documents", "metadatas", "distances"],
         )
         documents = result.get("documents", [[]])[0]
         metadatas = result.get("metadatas", [[]])[0]
         distances = result.get("distances", [[]])[0]
-        fragments = []
+        hits = []
         for document, metadata, distance in zip(documents, metadatas, distances):
-            similarity = 1 - distance
-            if similarity < self.min_similarity:
-                continue
-            source = metadata.get("source", "неизвестный источник")
-            fragments.append(f"[Источник: {source}; сходство: {similarity:.3f}]\n{document}")
+            hits.append({
+                "document": document,
+                "source": metadata.get("source", "неизвестный источник"),
+                "similarity": 1 - distance,
+            })
+        return hits
+
+    def format_context(self, question: str) -> str:
+        hits = self.search(question)
+        if not hits:
+            return "В базе знаний пока нет документов."
+        fragments = [
+            f"[Источник: {hit['source']}; сходство: {hit['similarity']:.3f}]\n{hit['document']}"
+            for hit in hits
+            if hit["similarity"] >= self.min_similarity
+        ]
         return "\n\n".join(fragments) if fragments else "В базе знаний нет релевантных фрагментов."
